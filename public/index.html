@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video Batch Editor</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --line: #262b36; --text: #e6e8ee; --muted: #8b93a7;
+    --accent: #4f8cff; --ok: #34c77b; --err: #ff5d5d; --warn: #f5b942;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 "Segoe UI", system-ui, sans-serif; }
+  header { padding: 14px 20px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 17px; margin: 0; font-weight: 600; }
+  header .sp { flex: 1; }
+  main { display: grid; grid-template-columns: 430px 1fr; gap: 16px; padding: 16px; }
+  @media (max-width: 1000px) { main { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
+  .card h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .card h3 .n { color: var(--muted); font-weight: 500; width: 18px; }
+  .card.off .body { opacity: .35; pointer-events: none; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+  .row label.l { width: 110px; color: var(--muted); flex-shrink: 0; }
+  .row input[type=range] { flex: 1; accent-color: var(--accent); }
+  .row .v { width: 52px; text-align: right; font-variant-numeric: tabular-nums; }
+  input[type=text], input[type=number], select {
+    background: #0f1218; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font: inherit;
+  }
+  input[type=text] { flex: 1; min-width: 0; }
+  input[type=number] { width: 72px; }
+  input[type=color] { width: 40px; height: 28px; border: 1px solid var(--line); background: none; border-radius: 6px; padding: 0; }
+  input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; }
+  button { background: #232836; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; font: inherit; cursor: pointer; }
+  button:hover { border-color: #3a4152; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.danger { background: #3a1d1f; border-color: #5c2a2d; color: #ffb4b4; }
+  button:disabled { opacity: .5; cursor: default; }
+  .hint { color: var(--muted); font-size: 12px; }
+  .previews { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .previews figure { margin: 0; background: #0b0d11; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; }
+  .previews figcaption { padding: 6px 10px; color: var(--muted); font-size: 12px; border-bottom: 1px solid var(--line); }
+  .previews .img { height: 340px; display: flex; align-items: center; justify-content: center; }
+  .previews img { max-width: 100%; max-height: 340px; display: block; }
+  .bar { height: 8px; background: #0b0d11; border-radius: 4px; overflow: hidden; }
+  .bar > div { height: 100%; background: var(--accent); width: 0; transition: width .3s; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  td, th { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+  th { color: var(--muted); font-weight: 500; }
+  td.name { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  td.msg { color: var(--muted); font-size: 12px; max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tag { font-size: 11px; padding: 2px 7px; border-radius: 10px; background: #232836; white-space: nowrap; }
+  .tag.done { background: #143224; color: var(--ok); } .tag.error { background: #3a1d1f; color: var(--err); }
+  .tag.running { background: #1a2a4a; color: #8db5ff; } .tag.skipped, .tag.cancelled { color: var(--muted); }
+  .list { max-height: 420px; overflow: auto; }
+  .stats { display: flex; gap: 16px; color: var(--muted); font-size: 13px; margin: 8px 0; flex-wrap: wrap; }
+  .stats b { color: var(--text); }
+  .part { display: flex; align-items: center; gap: 6px; padding: 5px 6px; margin: 4px 0; border: 1px solid var(--line); border-radius: 6px; background: #12151c; min-height: 40px; }
+  .part.drag { opacity: .4; } .part.over { border-color: var(--accent); }
+  .part .grip { color: var(--muted); cursor: grab; user-select: none; }
+  .part .mv { display: flex; flex-direction: column; }
+  .part .mv button { padding: 0 5px; font-size: 9px; line-height: 13px; border-radius: 3px; }
+  .part .pl { width: 92px; flex-shrink: 0; display: flex; align-items: center; gap: 5px; }
+  #toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: #3a1d1f; color: #ffd0d0; border: 1px solid #5c2a2d; padding: 10px 16px; border-radius: 8px; display: none; max-width: 80vw; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎬 Video Batch Editor</h1>
+  <span class="hint" id="scanInfo"></span>
+  <span class="sp"></span>
+  <button id="btnSave">Lưu cấu hình</button>
+  <button class="primary" id="btnStart">▶ Bắt đầu xử lý</button>
+  <button class="danger" id="btnStop" disabled>■ Dừng</button>
+</header>
+
+<main>
+<section>
+  <div class="card">
+    <h3>📁 Thư mục</h3>
+    <div class="row"><label class="l">Video gốc</label><input type="text" data-k="inputDir"><button data-pick="inputDir">…</button></div>
+    <div class="row"><label class="l">Thư mục nhạc</label><input type="text" data-k="musicDir"><button data-pick="musicDir">…</button></div>
+    <div class="row"><label class="l">Thư mục xuất</label><input type="text" data-k="outputDir"><button data-pick="outputDir">…</button></div>
+    <div class="row"><label class="l"></label><label><input type="checkbox" data-k="skipExisting"> Bỏ qua video đã xuất</label></div>
+  </div>
+
+  <div class="card">
+    <h3>🏷 Đặt tên file xuất</h3>
+    <div class="hint" style="margin-bottom:6px">Kéo thả hoặc bấm ▲▼ để đổi thứ tự các thành phần trong tên.</div>
+    <div id="nameParts">
+      <div class="part" data-part="prefix" draggable="true"><span class="grip">⠿</span><span class="mv"><button data-mv="-1">▲</button><button data-mv="1">▼</button></span>
+        <label class="pl">Tiền tố</label><input type="text" data-k="naming.prefix" placeholder="để trống = không dùng"></div>
+      <div class="part" data-part="index" draggable="true"><span class="grip">⠿</span><span class="mv"><button data-mv="-1">▲</button><button data-mv="1">▼</button></span>
+        <label class="pl"><input type="checkbox" data-k="naming.addIndex"> STT video</label>
+        <span data-show="naming.addIndex=true">từ <input type="number" data-k="naming.indexStart" min="0" style="width:58px"> · <input type="number" data-k="naming.indexPad" min="1" max="6" style="width:48px"> chữ số</span></div>
+      <div class="part" data-part="name" draggable="true"><span class="grip">⠿</span><span class="mv"><button data-mv="-1">▲</button><button data-mv="1">▼</button></span>
+        <label class="pl"><input type="checkbox" data-k="naming.keepName"> Tên gốc</label></div>
+      <div class="part" data-part="music" draggable="true"><span class="grip">⠿</span><span class="mv"><button data-mv="-1">▲</button><button data-mv="1">▼</button></span>
+        <label class="pl"><input type="checkbox" data-k="naming.addMusicIndex"> STT nhạc</label>
+        <span data-show="naming.addMusicIndex=true">chữ <input type="text" data-k="naming.musicLabel" style="width:64px;flex:none"> · <input type="number" data-k="naming.musicPad" min="1" max="6" style="width:48px"> chữ số</span></div>
+      <div class="part" data-part="suffix" draggable="true"><span class="grip">⠿</span><span class="mv"><button data-mv="-1">▲</button><button data-mv="1">▼</button></span>
+        <label class="pl">Hậu tố</label><input type="text" data-k="naming.suffix" placeholder="để trống = không dùng"></div>
+    </div>
+    <div class="row"><label class="l">Ký tự nối</label><input type="text" data-k="naming.separator" style="flex:0 0 60px"></div>
+    <div class="row"><label class="l">Ví dụ</label><code id="nameExample" style="color:var(--ok);word-break:break-all"></code></div>
+    <div class="hint">STT video theo thứ tự tên file trong thư mục gốc. STT nhạc là vị trí bài trong thư mục nhạc (xếp theo tên, bắt đầu từ 1). Bỏ tên gốc thì bắt buộc có STT video.</div>
+  </div>
+
+  <div class="card">
+    <h3>🖥 Hiệu năng</h3>
+    <div class="row"><label class="l">Xử lý cùng lúc</label><input type="number" data-k="perf.concurrency" min="1" max="16"><span class="hint">video / lượt</span></div>
+    <div class="hint" id="perfHint" style="margin:-2px 0 6px 118px"></div>
+    <div class="row"><label class="l"></label><label><input type="checkbox" data-k="perf.limitThreads"> Chia đều CPU cho các video đang chạy</label></div>
+    <div class="row"><label class="l"></label><label><input type="checkbox" data-k="perf.lowPriority"> Chạy ưu tiên thấp (máy không bị đơ)</label></div>
+    <div class="hint">Mỗi video xử lý xong sẽ tự lấy video tiếp theo, luôn giữ tối đa n video chạy cùng lúc. Máy yếu nên để 1–2.</div>
+  </div>
+
+  <div class="card" data-sec="color">
+    <h3><span class="n">1</span><input type="checkbox" data-k="color.enabled"> Bộ lọc màu</h3>
+    <div class="body">
+      <div class="row"><label class="l">Độ sáng</label><input type="range" data-k="color.brightness" min="-0.3" max="0.3" step="0.01"><span class="v"></span></div>
+      <div class="row"><label class="l">Tương phản</label><input type="range" data-k="color.contrast" min="0.5" max="2" step="0.01"><span class="v"></span></div>
+      <div class="row"><label class="l">Độ bão hòa</label><input type="range" data-k="color.saturation" min="0" max="2.5" step="0.01"><span class="v"></span></div>
+    </div>
+  </div>
+
+  <div class="card" data-sec="frame">
+    <h3><span class="n">2</span><input type="checkbox" data-k="frame.enabled"> Khung viền</h3>
+    <div class="body">
+      <div class="row"><label class="l">Kiểu</label>
+        <select data-k="frame.mode"><option value="color">Viền màu</option><option value="image">Ảnh khung PNG</option></select>
+      </div>
+      <div class="row" data-show="frame.mode=color"><label class="l">Màu viền</label><input type="color" data-k="frame.color"></div>
+      <div class="row" data-show="frame.mode=color"><label class="l">Độ dày (%)</label><input type="range" data-k="frame.thicknessPct" min="0.5" max="15" step="0.5"><span class="v"></span></div>
+      <div class="row" data-show="frame.mode=image"><label class="l">File khung</label><input type="text" data-k="frame.image" placeholder="PNG nền trong suốt"><button data-pick="frame.image" data-kind="image">…</button></div>
+      <div class="row"><label class="l">Độ mờ (opacity)</label><input type="range" data-k="frame.opacity" min="0" max="1" step="0.05"><span class="v"></span></div>
+    </div>
+  </div>
+
+  <div class="card" data-sec="speed">
+    <h3><span class="n">3</span><input type="checkbox" data-k="speed.enabled"> Tăng tốc</h3>
+    <div class="body">
+      <div class="row"><label class="l">Tốc độ</label><input type="range" data-k="speed.value" min="1" max="2" step="0.05"><span class="v" data-suffix="x"></span></div>
+    </div>
+  </div>
+
+  <div class="card" data-sec="flip">
+    <h3><span class="n">4</span><input type="checkbox" data-k="flip.enabled"> Lật video</h3>
+    <div class="body">
+      <div class="row"><label><input type="checkbox" data-k="flip.horizontal"> Lật ngang (gương)</label>&nbsp;&nbsp;<label><input type="checkbox" data-k="flip.vertical"> Lật dọc</label></div>
+    </div>
+  </div>
+
+  <div class="card" data-sec="rotate">
+    <h3><span class="n">5</span><input type="checkbox" data-k="rotate.enabled"> Xoay nhẹ</h3>
+    <div class="body">
+      <div class="row"><label class="l">Góc (độ)</label>từ <input type="number" data-k="rotate.min" step="0.1" min="0" max="10"> đến <input type="number" data-k="rotate.max" step="0.1" min="0" max="10"></div>
+      <div class="row"><label class="l"></label><label><input type="checkbox" data-k="rotate.randomDirection"> Ngẫu nhiên trái/phải</label></div>
+      <div class="hint">Mỗi video lấy một góc ngẫu nhiên trong khoảng này.</div>
+    </div>
+  </div>
+
+  <div class="card" data-sec="scale">
+    <h3><span class="n">6</span><input type="checkbox" data-k="scale.enabled"> Phóng to (scale)</h3>
+    <div class="body">
+      <div class="row"><label class="l">Tỉ lệ (%)</label><input type="range" data-k="scale.percent" min="100" max="130" step="1"><span class="v" data-suffix="%"></span></div>
+      <div class="row"><label class="l"></label><label><input type="checkbox" data-k="scale.autoFill"> Tự zoom thêm nếu cần để không lộ góc đen khi xoay</label></div>
+    </div>
+  </div>
+
+  <div class="card" data-sec="mute">
+    <h3><span class="n">7</span><input type="checkbox" data-k="mute.enabled"> Xóa tiếng gốc</h3>
+    <div class="body"><div class="hint">Bỏ chọn để giữ tiếng gốc (sẽ trộn chung với nhạc).</div></div>
+  </div>
+
+  <div class="card" data-sec="music">
+    <h3><span class="n">8</span><input type="checkbox" data-k="music.enabled"> Ghép nhạc ngẫu nhiên</h3>
+    <div class="body">
+      <div class="row"><label class="l">Âm lượng</label><input type="range" data-k="music.volume" min="0" max="2" step="0.05"><span class="v"></span></div>
+      <div class="row"><label class="l">Fade cuối (giây)</label><input type="range" data-k="music.fadeOut" min="0" max="5" step="0.5"><span class="v"></span></div>
+      <div class="hint">Nhận mp3, m4a, wav, aac, flac… và cả file mp4/mov có tiếng. Nhạc ngắn hơn video sẽ được lặp lại, dài hơn sẽ bị cắt đúng bằng độ dài video. Mỗi bài được dùng hết một lượt rồi mới lặp lại.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>⚙️ Xuất file</h3>
+    <div class="row"><label class="l">Bộ mã hóa</label>
+      <select data-k="encode.encoder">
+        <option value="auto">Tự động (ưu tiên card đồ họa)</option><option value="nvenc">Card NVIDIA (NVENC)</option>
+        <option value="qsv">Card onboard Intel (QSV)</option><option value="amf">Card AMD (AMF)</option><option value="cpu">CPU (x264)</option>
+      </select>
+    </div>
+    <div class="hint" id="encHint" style="margin:-2px 0 6px 118px"></div>
+    <div class="row" data-show="encode.encoder=cpu"><label class="l">Tốc độ nén</label>
+      <select data-k="encode.preset">
+        <option value="ultrafast">ultrafast (nhanh nhất)</option><option value="veryfast">veryfast</option>
+        <option value="fast">fast</option><option value="medium">medium (nét hơn)</option>
+      </select>
+    </div>
+    <div class="row"><label class="l">Chất lượng CRF</label><input type="range" data-k="encode.crf" min="16" max="30" step="1"><span class="v"></span></div>
+    <div class="hint">CRF càng thấp càng nét, file càng nặng. 18–23 là hợp lý. Card đồ họa chỉ đảm nhận khâu nén; các hiệu ứng (xoay, scale, lọc màu, khung) vẫn chạy trên CPU.</div>
+  </div>
+</section>
+
+<section>
+  <div class="card">
+    <h3>👁 Xem trước <span class="sp" style="flex:1"></span>
+      <button id="prevPrev">◀</button><span class="hint" id="prevName"></span><button id="prevNext">▶</button>
+      <button id="btnPreview">Cập nhật</button>
+    </h3>
+    <div class="previews">
+      <figure><figcaption>Gốc</figcaption><div class="img"><img id="imgBefore" alt=""></div></figure>
+      <figure><figcaption>Sau khi edit (xoay theo góc lớn nhất)</figcaption><div class="img"><img id="imgAfter" alt=""></div></figure>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>📊 Tiến trình <span class="sp" style="flex:1"></span><button id="btnOpenOut">Mở thư mục xuất</button></h3>
+    <div class="bar"><div id="totalBar"></div></div>
+    <div class="stats" id="stats"></div>
+    <div class="list"><table><thead><tr><th>#</th><th>Video</th><th>Tên mới</th><th>Trạng thái</th><th style="width:140px">Tiến độ</th><th>Ghi chú</th></tr></thead><tbody id="rows"></tbody></table></div>
+  </div>
+</section>
+</main>
+<div id="toast"></div>
+
+<script>
+let cfg = {};
+let previewIndex = 0;
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const get = (o, k) => k.split('.').reduce((a, p) => (a == null ? a : a[p]), o);
+const set = (o, k, v) => { const ps = k.split('.'); const last = ps.pop(); ps.reduce((a, p) => (a[p] ??= {}), o)[last] = v; };
+
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => (t.style.display = 'none'), 5000); }
+
+async function api(method, url, body) {
+  const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error || 'Lỗi');
+  return d;
+}
+
+function render() {
+  for (const el of $$('[data-k]')) {
+    const v = get(cfg, el.dataset.k);
+    if (el.type === 'checkbox') el.checked = !!v; else el.value = v ?? '';
+  }
+  renderOrder();
+  refreshUi();
+}
+
+const PARTS = ['prefix', 'index', 'name', 'music', 'suffix'];
+function nameOrder() {
+  const o = (cfg.naming.order || []).filter((p) => PARTS.includes(p));
+  return [...o, ...PARTS.filter((p) => !o.includes(p))];
+}
+function renderOrder() {
+  const box = $('#nameParts');
+  for (const p of nameOrder()) box.appendChild($(`[data-part="${p}"]`, box));
+}
+function movePart(part, toIndex) {
+  const o = nameOrder().filter((p) => p !== part);
+  o.splice(Math.max(0, Math.min(o.length, toIndex)), 0, part);
+  cfg.naming.order = o;
+  renderOrder(); refreshUi();
+}
+
+function refreshUi() {
+  for (const el of $$('input[type=range]')) {
+    const v = el.nextElementSibling;
+    if (v && v.classList.contains('v')) v.textContent = el.value + (v.dataset.suffix || '');
+  }
+  for (const card of $$('[data-sec]')) card.classList.toggle('off', !get(cfg, card.dataset.sec + '.enabled'));
+  for (const el of $$('[data-show]')) { const [k, val] = el.dataset.show.split('='); el.style.display = String(get(cfg, k)) === val ? '' : 'none'; }
+  clearTimeout(nameTimer); nameTimer = setTimeout(nameExample, 200);
+  if (sys.encoders) {
+    const NAME = { cpu: 'CPU', nvenc: 'NVIDIA', qsv: 'Intel', amf: 'AMD' };
+    const e = cfg.encode.encoder;
+    $('#encHint').textContent = e === 'auto' ? `Sẽ dùng: ${NAME[sys.auto]}`
+      : sys.encoders.includes(e) ? 'Có sẵn trên máy này ✓' : 'Máy không hỗ trợ → sẽ dùng CPU';
+    for (const o of $$('[data-k="encode.encoder"] option')) if (o.value !== 'auto' && !sys.encoders.includes(o.value)) o.textContent = o.textContent.replace(/( — không có)?$/, ' — không có');
+  }
+  if (cpus) {
+    const n = Math.max(1, Number(cfg.perf.concurrency) || 1);
+    $('#perfHint').textContent = `Máy có ${cpus} luồng CPU` + (cfg.perf.limitThreads ? ` → mỗi video dùng ${Math.max(1, Math.floor(cpus / n))} luồng` : '');
+  }
+}
+let cpus = 0, sys = {}, nameTimer;
+async function nameExample() {
+  try { $('#nameExample').textContent = (await api('POST', '/api/name-example', cfg)).example; } catch {}
+}
+
+function readInput(el) {
+  let v = el.type === 'checkbox' ? el.checked : el.value;
+  if (el.type === 'range' || el.type === 'number') v = Number(v);
+  set(cfg, el.dataset.k, v);
+}
+
+let previewTimer;
+function schedulePreview() { clearTimeout(previewTimer); previewTimer = setTimeout(preview, 450); }
+
+async function scan() {
+  try {
+    const r = await api('POST', '/api/scan', { inputDir: cfg.inputDir, musicDir: cfg.musicDir });
+    $('#scanInfo').textContent = `${r.videos} video · ${r.music} bài nhạc`;
+  } catch {}
+}
+
+async function preview() {
+  if (!cfg.inputDir) return;
+  $('#btnPreview').disabled = true;
+  try {
+    const r = await api('POST', '/api/preview', { ...cfg, previewIndex });
+    previewIndex = r.index;
+    $('#imgBefore').src = r.before; $('#imgAfter').src = r.after;
+    $('#prevName').textContent = `${r.index + 1}/${r.total} · ${r.name}`;
+  } catch (e) { toast('Xem trước lỗi: ' + e.message); }
+  $('#btnPreview').disabled = false;
+}
+
+for (const el of $$('[data-k]')) {
+  const ev = el.type === 'text' && !el.dataset.k.startsWith('naming.') ? 'change' : 'input';
+  el.addEventListener(ev, () => {
+    readInput(el); refreshUi();
+    if (['inputDir', 'musicDir'].includes(el.dataset.k)) scan();
+    if (/^(inputDir|color\.|frame\.|flip\.|rotate\.|scale\.)/.test(el.dataset.k)) schedulePreview();
+  });
+}
+
+for (const b of $$('[data-pick]')) {
+  b.addEventListener('click', async () => {
+    const k = b.dataset.pick;
+    b.disabled = true;
+    try {
+      const r = await api('POST', '/api/pick', { kind: b.dataset.kind || 'folder', initial: get(cfg, k) });
+      if (r.path) {
+        set(cfg, k, r.path); render();
+        if (k === 'inputDir' && !cfg.outputDir) { cfg.outputDir = r.path.replace(/[\\/]+$/, '') + '_edited'; render(); }
+        scan(); if (k === 'inputDir' || k === 'frame.image') { previewIndex = 0; preview(); }
+      }
+    } catch (e) { toast(e.message); }
+    b.disabled = false;
+  });
+}
+
+for (const row of $$('#nameParts .part')) {
+  const part = row.dataset.part;
+  for (const b of $$('[data-mv]', row)) b.addEventListener('click', () => movePart(part, nameOrder().indexOf(part) + Number(b.dataset.mv)));
+  // Only start a drag from the row itself, so text inputs inside stay selectable.
+  row.addEventListener('mousedown', (e) => { row.draggable = !e.target.closest('input,button'); });
+  row.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', part); row.classList.add('drag'); });
+  row.addEventListener('dragend', () => row.classList.remove('drag'));
+  row.addEventListener('dragover', (e) => { e.preventDefault(); row.classList.add('over'); });
+  row.addEventListener('dragleave', () => row.classList.remove('over'));
+  row.addEventListener('drop', (e) => {
+    e.preventDefault(); row.classList.remove('over');
+    const from = e.dataTransfer.getData('text/plain');
+    if (from && from !== part) movePart(from, nameOrder().filter((p) => p !== from).indexOf(part) + (nameOrder().indexOf(from) < nameOrder().indexOf(part) ? 1 : 0));
+  });
+}
+
+$('#btnPreview').onclick = preview;
+$('#prevPrev').onclick = () => { previewIndex = Math.max(0, previewIndex - 1); preview(); };
+$('#prevNext').onclick = () => { previewIndex++; preview(); };
+$('#btnSave').onclick = async () => { try { await api('POST', '/api/config', cfg); toast('Đã lưu cấu hình'); } catch (e) { toast(e.message); } };
+$('#btnStart').onclick = async () => { try { await api('POST', '/api/start', cfg); poll(); } catch (e) { toast(e.message); } };
+$('#btnStop').onclick = () => api('POST', '/api/stop').catch((e) => toast(e.message));
+$('#btnOpenOut').onclick = () => api('POST', '/api/open-output', { dir: cfg.outputDir });
+
+const LABEL = { pending: 'Chờ', running: 'Đang xử lý', done: 'Xong', error: 'Lỗi', skipped: 'Bỏ qua', cancelled: 'Đã hủy' };
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+let pollTimer;
+async function poll() {
+  clearTimeout(pollTimer);
+  let s;
+  try { s = await api('GET', '/api/status'); } catch { pollTimer = setTimeout(poll, 2000); return; }
+  $('#btnStart').disabled = s.running; $('#btnStop').disabled = !s.running;
+  const items = s.items || [];
+  const c = (st) => items.filter((i) => i.status === st).length;
+  const total = items.length || 1;
+  const prog = items.reduce((a, i) => a + (i.progress || 0), 0) / total;
+  $('#totalBar').style.width = (prog * 100).toFixed(1) + '%';
+  if (items.length) {
+    const secs = Math.round(((s.finishedAt || Date.now()) - s.startedAt) / 1000);
+    $('#stats').innerHTML = `<span>Tổng <b>${items.length}</b></span><span>Xong <b>${c('done')}</b></span><span>Lỗi <b>${c('error')}</b></span>${s.running ? `<span>Đang chạy <b>${c('running')}/${s.concurrency}</b></span><span>Chờ <b>${c('pending')}</b></span>` : ''}<span>Bỏ qua <b>${c('skipped')}</b></span><span>Thời gian <b>${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}</b></span><span>${s.running ? 'Đang chạy… ' + (prog * 100).toFixed(1) + '%' : 'Hoàn tất'}</span>`;
+  }
+  $('#rows').innerHTML = items.map((i, n) => `<tr><td>${n + 1}</td><td class="name" title="${esc(i.name)}">${esc(i.name)}</td><td class="name" title="${esc(i.outName || '')}">${esc(i.outName || '')}</td><td><span class="tag ${i.status}">${LABEL[i.status]}</span></td><td><div class="bar"><div style="width:${(i.progress * 100).toFixed(1)}%;${i.status === 'error' ? 'background:var(--err)' : i.status === 'done' ? 'background:var(--ok)' : ''}"></div></div></td><td class="msg" title="${esc(i.msg)}">${esc(i.msg)}</td></tr>`).join('');
+  if (s.running) pollTimer = setTimeout(poll, 700);
+}
+
+(async () => {
+  cfg = await api('GET', '/api/config');
+  sys = await api('GET', '/api/system').catch(() => ({}));
+  cpus = sys.cpus || 0;
+  render(); scan(); poll();
+  if (cfg.inputDir) preview();
+})();
+</script>
+</body>
+</html>
