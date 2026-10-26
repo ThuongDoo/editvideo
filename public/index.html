@@ -71,6 +71,7 @@
   <span class="sp"></span>
   <button id="btnSave">Lưu cấu hình</button>
   <button class="primary" id="btnStart">▶ Bắt đầu xử lý</button>
+  <button id="btnRetry" style="display:none;border-color:var(--warn);color:var(--warn)"></button>
   <button class="danger" id="btnStop" disabled>■ Dừng</button>
 </header>
 
@@ -365,7 +366,8 @@ $('#prevPrev').onclick = () => { previewIndex = Math.max(0, previewIndex - 1); p
 $('#prevNext').onclick = () => { previewIndex++; preview(); };
 $('#btnSave').onclick = async () => { try { await api('POST', '/api/config', cfg); toast('Đã lưu cấu hình'); } catch (e) { toast(e.message); } };
 $('#btnStart').onclick = async () => { try { await api('POST', '/api/start', cfg); poll(); } catch (e) { toast(e.message); } };
-$('#btnStop').onclick = () => api('POST', '/api/stop').catch((e) => toast(e.message));
+$('#btnRetry').onclick = async () => { try { await api('POST', '/api/retry', cfg); poll(); } catch (e) { toast(e.message); } };
+$('#btnStop').onclick =() => api('POST', '/api/stop').catch((e) => toast(e.message));
 $('#btnOpenOut').onclick = () => api('POST', '/api/open-output', { dir: cfg.outputDir });
 
 const LABEL = { pending: 'Chờ', running: 'Đang xử lý', done: 'Xong', error: 'Lỗi', skipped: 'Bỏ qua', cancelled: 'Đã hủy' };
@@ -379,6 +381,9 @@ async function poll() {
   $('#btnStart').disabled = s.running; $('#btnStop').disabled = !s.running;
   const items = s.items || [];
   const c = (st) => items.filter((i) => i.status === st).length;
+  const errors = c('error');
+  $('#btnRetry').style.display = !s.running && errors ? '' : 'none';
+  $('#btnRetry').textContent = `↻ Chạy lại ${errors} file lỗi`;
   const total = items.length || 1;
   const prog = items.reduce((a, i) => a + (i.progress || 0), 0) / total;
   $('#totalBar').style.width = (prog * 100).toFixed(1) + '%';

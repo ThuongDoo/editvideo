@@ -57,8 +57,14 @@ const ENC_LABEL = { cpu: 'CPU', nvenc: 'NVIDIA', qsv: 'Intel', amf: 'AMD' };
 // ---------- batch job ----------
 let job = null; // { running, stopping, items: [...], procs: Set }
 
-async function startJob(cfg) {
+// `retryErrors`: reuse the previous list and only re-run the items that failed.
+async function startJob(cfg, { retryErrors = false } = {}) {
   if (job && job.running) throw new Error('Đang chạy, hãy dừng trước');
+  const prev = job;
+  if (retryErrors) {
+    if (!prev || !prev.items.some((it) => it.status === 'error')) throw new Error('Không có file lỗi nào để chạy lại');
+    if (path.resolve(prev.inputDir) !== path.resolve(cfg.inputDir || '')) throw new Error('Thư mục video gốc đã đổi, hãy bấm Bắt đầu xử lý');
+  }
   if (!cfg.inputDir || !fs.existsSync(cfg.inputDir)) throw new Error('Thư mục video gốc không tồn tại');
   if (!cfg.outputDir) throw new Error('Chưa chọn thư mục xuất');
   if (path.resolve(cfg.inputDir) === path.resolve(cfg.outputDir)) throw new Error('Thư mục xuất phải khác thư mục gốc');
@@ -70,12 +76,12 @@ async function startJob(cfg) {
   if (cfg.music.enabled && !musicFiles.length) throw new Error('Thư mục nhạc không có file nào có tiếng (mp3, m4a, wav, mp4…)');
   const picker = new P.MusicPicker(musicFiles);
 
+  const fresh = (it) => ({ ...it, status: 'pending', progress: 0, msg: '', outName: '' });
   job = {
-    running: true, stopping: false, procs: new Set(), startedAt: Date.now(),
-    items: videos.map((v, index) => ({
-      name: path.basename(v), input: v, base: path.basename(v, path.extname(v)), index,
-      output: '', status: 'pending', progress: 0, msg: '',
-    })),
+    running: true, stopping: false, procs: new Set(), startedAt: Date.now(), inputDir: cfg.inputDir,
+    items: retryErrors
+      ? prev.items.map((it) => (it.status === 'error' ? fresh(it) : { ...it }))
+      : videos.map((v, index) => fresh({ name: path.basename(v), input: v, base: path.basename(v, path.extname(v)), index })),
   };
   const existing = fs.readdirSync(cfg.outputDir);
   const current = job;
@@ -90,6 +96,7 @@ async function startJob(cfg) {
   async function worker() {
     while (!current.stopping && next < current.items.length) {
       const it = current.items[next++];
+      if (it.status !== 'pending') continue;
       const found = cfg.skipExisting && N.findExisting(cfg.naming, cfg.outputDir, existing, it);
       if (found) { it.status = 'skipped'; it.progress = 1; it.outName = found; it.msg = 'Đã có file xuất'; continue; }
       it.status = 'running';
@@ -190,6 +197,7 @@ const routes = {
     return { before, after, name: path.basename(videos[i]), index: i, total: videos.length };
   },
   'POST /api/start': async (body) => { const cfg = merge(DEFAULTS, body); saveConfig(cfg); await startJob(cfg); return { ok: true }; },
+  'POST /api/retry': async (body) => { const cfg = merge(DEFAULTS, body); saveConfig(cfg); await startJob(cfg, { retryErrors: true }); return { ok: true }; },
   'POST /api/stop': async () => { stopJob(); return { ok: true }; },
   'GET /api/status': async () => {
     if (!job) return { running: false, items: [] };
