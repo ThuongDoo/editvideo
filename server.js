@@ -5,6 +5,7 @@ const path = require('path');
 const { spawn, exec } = require('child_process');
 const P = require('./lib/processor');
 const N = require('./lib/naming');
+const { CpuLimiter } = require('./lib/cpu');
 
 const PORT = Number(process.env.PORT) || 5577;
 const CONFIG_FILE = path.join(__dirname, 'config.json');
@@ -17,7 +18,7 @@ const DEFAULTS = {
     addMusicIndex: false, musicLabel: 'nhac', musicPad: 2, suffix: '', separator: '_',
     order: ['prefix', 'index', 'name', 'music', 'suffix'],
   },
-  perf: { concurrency: 2, lowPriority: true, limitThreads: true },
+  perf: { concurrency: 2, lowPriority: true, limitThreads: true, maxThreads: 0, power: 100 },
   color: { enabled: true, brightness: 0.05, contrast: 1.1, saturation: 1.2 },
   frame: { enabled: true, mode: 'color', color: '#ffffff', thicknessPct: 3, opacity: 0.6, image: '' },
   speed: { enabled: true, value: 1.1 },
@@ -87,9 +88,13 @@ async function startJob(cfg, { retryErrors = false } = {}) {
   const current = job;
   let next = 0;
   const n = Math.min(16, Math.max(1, Math.round(Number(cfg.perf.concurrency)) || 1));
+  // 0 = every CPU thread on the machine.
+  const maxThreads = Math.min(os.cpus().length, Math.max(0, Math.round(Number(cfg.perf.maxThreads)) || 0)) || os.cpus().length;
   // Split CPU threads between parallel jobs so n encoders don't each grab every core.
-  const threads = cfg.perf.limitThreads ? Math.max(1, Math.floor(os.cpus().length / n)) : 0;
+  const threads = cfg.perf.limitThreads ? Math.max(1, Math.floor(maxThreads / n)) : 0;
   current.concurrency = n;
+  const limiter = new CpuLimiter({ maxCores: maxThreads, power: cfg.perf.power });
+  current.limiter = limiter;
   const encoder = await P.resolveEncoder(cfg.encode.encoder);
   current.encoder = encoder;
 
@@ -109,6 +114,7 @@ async function startJob(cfg, { retryErrors = false } = {}) {
           onProgress: (p) => { it.progress = p; },
           onSpawn: (proc) => {
             current.procs.add(proc);
+            limiter.add(proc.pid);
             proc.on('close', () => current.procs.delete(proc));
             if (cfg.perf.lowPriority) { try { os.setPriority(proc.pid, os.constants.priority.PRIORITY_BELOW_NORMAL); } catch {} }
           },
@@ -124,6 +130,7 @@ async function startJob(cfg, { retryErrors = false } = {}) {
 
   Promise.all(Array.from({ length: n }, worker)).then(() => {
     for (const it of current.items) if (it.status === 'pending') it.status = 'cancelled';
+    limiter.stop();
     current.running = false;
     current.finishedAt = Date.now();
   });
@@ -201,7 +208,7 @@ const routes = {
   'POST /api/stop': async () => { stopJob(); return { ok: true }; },
   'GET /api/status': async () => {
     if (!job) return { running: false, items: [] };
-    const { procs, ...rest } = job;
+    const { procs, limiter, ...rest } = job;
     return rest;
   },
   'POST /api/open-output': async (body) => { if (body.dir && fs.existsSync(body.dir)) spawn('explorer.exe', [body.dir]); return { ok: true }; },

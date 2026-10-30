@@ -111,8 +111,10 @@
     <h3>🖥 Hiệu năng</h3>
     <div class="row"><label class="l">Xử lý cùng lúc</label><input type="number" data-k="perf.concurrency" min="1" max="16"><span class="hint">video / lượt</span></div>
     <div class="hint" id="perfHint" style="margin:-2px 0 6px 118px"></div>
-    <div class="row"><label class="l"></label><label><input type="checkbox" data-k="perf.limitThreads"> Chia đều CPU cho các video đang chạy</label></div>
-    <div class="row"><label class="l"></label><label><input type="checkbox" data-k="perf.lowPriority"> Chạy ưu tiên thấp (máy không bị đơ)</label></div>
+    <div class="row"><label class="l">Số luồng tối đa</label><input type="number" data-k="perf.maxThreads" min="0" max="64"><span class="hint">0 = dùng hết</span></div>
+    <div class="row"><label class="l">Công suất mỗi luồng</label><input type="range" data-k="perf.power" min="30" max="100" step="5"><span class="v" data-suffix="%"></span></div>
+    <div class="hint" style="margin:-2px 0 6px 118px">Hạ xuống 60–80% nếu máy nóng và tụt xung. 100% = không giới hạn.</div>
+    <div class="row"><label class="l"></label><label><input type="checkbox" data-k="perf.limitThreads"> Chia đều CPU cho các video đang chạy</label></div>    <div class="row"><label class="l"></label><label><input type="checkbox" data-k="perf.lowPriority"> Chạy ưu tiên thấp (máy không bị đơ)</label></div>
     <div class="hint">Mỗi video xử lý xong sẽ tự lấy video tiếp theo, luôn giữ tối đa n video chạy cùng lúc. Máy yếu nên để 1–2.</div>
   </div>
 
@@ -284,7 +286,8 @@ function refreshUi() {
   }
   if (cpus) {
     const n = Math.max(1, Number(cfg.perf.concurrency) || 1);
-    $('#perfHint').textContent = `Máy có ${cpus} luồng CPU` + (cfg.perf.limitThreads ? ` → mỗi video dùng ${Math.max(1, Math.floor(cpus / n))} luồng` : '');
+    const max = Math.min(cpus, Math.max(0, Math.round(Number(cfg.perf.maxThreads)) || 0)) || cpus;
+    $('#perfHint').textContent = `Máy có ${cpus} luồng CPU` + (max < cpus ? `, app chỉ dùng ${max}` : '') + (cfg.perf.limitThreads ? ` → mỗi video dùng ${Math.max(1, Math.floor(max / n))} luồng` : '');
   }
 }
 let cpus = 0, sys = {}, nameTimer;

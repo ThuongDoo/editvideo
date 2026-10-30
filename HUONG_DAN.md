@@ -19,6 +19,8 @@ Tự động edit hàng loạt video: lọc màu, khung viền, tăng tốc, l�
 
 ## Mẹo
 - **Hiệu năng**: máy yếu để "Xử lý cùng lúc" 1–2 video. Bật "Chạy ưu tiên thấp" để máy không bị đơ.
+  - **Số luồng tối đa**: số luồng CPU app được phép dùng (ví dụ máy 8 luồng để 6 thì app dùng tối đa ~75% CPU, còn 2 luồng cho việc khác). Để 0 là dùng hết.
+  - **Công suất mỗi luồng**: các luồng edit chỉ chạy tối đa bấy nhiêu % thay vì 100%, giúp CPU mát hơn và không bị tụt xung vì nóng. Máy nóng thì để 60–80%.
 - **Bộ mã hóa**: chọn "Tự động" để dùng card đồ họa (NVIDIA / Intel / AMD) nếu máy có; lỗi thì tự chuyển sang CPU.
 - **Nhạc**: nhận mp3, m4a, wav, aac, flac… và cả file mp4 có tiếng. Nhạc ngắn sẽ lặp lại, nhạc dài sẽ bị cắt vừa video.
 - **Khung viền**: chọn "Viền màu" hoặc "Ảnh khung PNG" (ảnh nền trong suốt, tự co giãn theo video).
