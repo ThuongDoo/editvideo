@@ -80,7 +80,7 @@
   <div class="card">
     <h3>📁 Thư mục</h3>
     <div class="row"><label class="l">Video gốc</label><input type="text" data-k="inputDir"><button data-pick="inputDir">…</button></div>
-    <div class="row"><label class="l">Thư mục nhạc</label><input type="text" data-k="musicDir"><button data-pick="musicDir">…</button></div>
+    <div class="row" data-show="music.enabled=true"><label class="l">Thư mục nhạc</label><input type="text" data-k="musicDir"><button data-pick="musicDir">…</button></div>
     <div class="row"><label class="l">Thư mục xuất</label><input type="text" data-k="outputDir"><button data-pick="outputDir">…</button></div>
     <div class="row"><label class="l"></label><label><input type="checkbox" data-k="skipExisting"> Bỏ qua video đã xuất</label></div>
   </div>
@@ -181,7 +181,7 @@
     <div class="body">
       <div class="row"><label class="l">Âm lượng</label><input type="range" data-k="music.volume" min="0" max="2" step="0.05"><span class="v"></span></div>
       <div class="row"><label class="l">Fade cuối (giây)</label><input type="range" data-k="music.fadeOut" min="0" max="5" step="0.5"><span class="v"></span></div>
-      <div class="hint">Nhận mp3, m4a, wav, aac, flac… và cả file mp4/mov có tiếng. Nhạc ngắn hơn video sẽ được lặp lại, dài hơn sẽ bị cắt đúng bằng độ dài video. Mỗi bài được dùng hết một lượt rồi mới lặp lại.</div>
+      <div class="hint">Bỏ chọn ô ở tiêu đề để tắt ghép nhạc (tên file xuất sẽ không có STT nhạc). Nhận mp3, m4a, wav, aac, flac… và cả file mp4/mov có tiếng. Nhạc ngắn hơn video sẽ được lặp lại, dài hơn sẽ bị cắt đúng bằng độ dài video. Mỗi bài được dùng hết một lượt rồi mới lặp lại.</div>
     </div>
   </div>
 
@@ -201,7 +201,9 @@
       </select>
     </div>
     <div class="row"><label class="l">Chất lượng CRF</label><input type="range" data-k="encode.crf" min="16" max="30" step="1"><span class="v"></span></div>
-    <div class="hint">CRF càng thấp càng nét, file càng nặng. 18–23 là hợp lý. Card đồ họa chỉ đảm nhận khâu nén; các hiệu ứng (xoay, scale, lọc màu, khung) vẫn chạy trên CPU.</div>
+    <div class="row"><label class="l"></label><label><input type="checkbox" data-k="encode.limitBitrate"> Nén bitrate tối đa</label>
+      <span data-show="encode.limitBitrate=true"><input type="number" data-k="encode.maxBitrate" min="0.5" max="100" step="0.5" style="width:64px"> Mbps</span></div>
+    <div class="hint">CRF càng thấp càng nét, file càng nặng. 18–23 là hợp lý. Nén bitrate: video nặng bị ép xuống tối đa mức này (8 Mbps ≈ 60 MB/phút), video nhẹ hơn giữ nguyên. Card đồ họa chỉ đảm nhận khâu nén; các hiệu ứng (xoay, scale, lọc màu, khung) vẫn chạy trên CPU.</div>
   </div>
 </section>
 

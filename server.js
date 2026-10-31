@@ -27,7 +27,7 @@ const DEFAULTS = {
   scale: { enabled: true, percent: 105, autoFill: true },
   mute: { enabled: true },
   music: { enabled: true, volume: 1, fadeOut: 1.5 },
-  encode: { encoder: 'auto', preset: 'veryfast', crf: 20 },
+  encode: { encoder: 'auto', preset: 'veryfast', crf: 20, limitBitrate: true, maxBitrate: 8 },
 };
 
 function merge(base, over) {
@@ -76,6 +76,8 @@ async function startJob(cfg, { retryErrors = false } = {}) {
   const musicFiles = cfg.music.enabled ? await P.listMusic(cfg.musicDir) : [];
   if (cfg.music.enabled && !musicFiles.length) throw new Error('Thư mục nhạc không có file nào có tiếng (mp3, m4a, wav, mp4…)');
   const picker = new P.MusicPicker(musicFiles);
+  // No music → no music number in the name, so skip-existing must not look for one either.
+  const naming = cfg.music.enabled ? cfg.naming : { ...cfg.naming, addMusicIndex: false };
 
   const fresh = (it) => ({ ...it, status: 'pending', progress: 0, msg: '', outName: '' });
   job = {
@@ -102,11 +104,11 @@ async function startJob(cfg, { retryErrors = false } = {}) {
     while (!current.stopping && next < current.items.length) {
       const it = current.items[next++];
       if (it.status !== 'pending') continue;
-      const found = cfg.skipExisting && N.findExisting(cfg.naming, cfg.outputDir, existing, it);
+      const found = cfg.skipExisting && N.findExisting(naming, cfg.outputDir, existing, it);
       if (found) { it.status = 'skipped'; it.progress = 1; it.outName = found; it.msg = 'Đã có file xuất'; continue; }
       it.status = 'running';
       const music = picker.next();
-      it.outName = N.outputName(cfg.naming, { index: it.index, base: it.base, musicIndex: music ? musicFiles.indexOf(music) : null }) + '.mp4';
+      it.outName = N.outputName(naming, { index: it.index, base: it.base, musicIndex: music ? musicFiles.indexOf(music) : null }) + '.mp4';
       try {
         const r = await P.processVideo(cfg, it.input, path.join(cfg.outputDir, it.outName), music, {
           threads,
